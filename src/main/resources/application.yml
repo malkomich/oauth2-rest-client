@@ -1,0 +1,22 @@
+server.port: 8082
+
+spring.application.name: oauth2-rest-client
+
+security.oauth2.client:
+  grantType: client_credentials
+  clientId: ${CLIENT_ID}
+  clientSecret: ${CLIENT_SECRET}
+  accessTokenUri: https://dev-70576723.okta.com/oauth2/default/v1/token
+  scope: document.read
+
+api.document:
+  fetch:
+    host: http://localhost:8085
+    endpoint: document/{id}
+  publish:
+    host: http://localhost:8086
+    endpoint: document
+
+logging.level:
+  com.okta.developer: DEBUG
+  org.springframework.web: DEBUG
