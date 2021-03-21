@@ -17,9 +17,9 @@ public class DocumentPublisherFeignClient implements DocumentPublisher {
         return documentClient.publishDocument(request);
     }
 
-    @FeignClient(name = "documentClient",
+    @FeignClient(name = "documentPublish",
                  url = "${api.document.publish.host}",
-                 configuration= FeignClientConfig.class)
+                 configuration= FeignClientConfig.FeignClientDocumentPublishConfig.class)
     public interface DocumentClient {
 
         @GetMapping("${api.document.publish.endpoint}")

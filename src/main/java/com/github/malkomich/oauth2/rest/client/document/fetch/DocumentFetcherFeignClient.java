@@ -18,9 +18,9 @@ public class DocumentFetcherFeignClient implements DocumentFetcher {
         return documentClient.fetchDocument(id);
     }
 
-    @FeignClient(name = "documentClient",
+    @FeignClient(name = "documentFetch",
                  url = "${api.document.fetch.host}",
-                 configuration= FeignClientConfig.class)
+                 configuration= FeignClientConfig.FeignClientDocumentFetchConfig.class)
     public interface DocumentClient {
 
         @GetMapping("${api.document.fetch.endpoint}")

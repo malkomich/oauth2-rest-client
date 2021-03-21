@@ -3,11 +3,18 @@ server.port: 8082
 spring.application.name: oauth2-rest-client
 
 security.oauth2.client:
-  grantType: client_credentials
-  clientId: ${CLIENT_ID}
-  clientSecret: ${CLIENT_SECRET}
-  accessTokenUri: https://dev-70576723.okta.com/oauth2/default/v1/token
-  scope: document.read
+  documentFetch:
+    grantType: client_credentials
+    clientId: ${CLIENT_ID}
+    clientSecret: ${CLIENT_SECRET}
+    accessTokenUri: https://dev-70576723.okta.com/oauth2/default/v1/token
+    scope: document.read
+  documentPublish:
+    grantType: client_credentials
+    clientId: ${CLIENT_ID}
+    clientSecret: ${CLIENT_SECRET}
+    accessTokenUri: https://dev-70576723.okta.com/oauth2/default/v1/token
+    scope: document.read
 
 api.document:
   fetch:

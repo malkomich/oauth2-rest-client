@@ -2,7 +2,6 @@ package com.github.malkomich.oauth2.rest.client.config;
 
 import com.github.malkomich.oauth2.rest.client.document.fetch.DocumentFetcherErrorHandler;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
@@ -35,15 +34,23 @@ public class RestTemplateConfig {
     private static final String TRACE_ID = "traceId";
     private static final String REGISTRATION_ID = "oauth2-rest-client";
 
-    @Autowired
-    private Oauth2Properties oauth2Properties;
-
-    @Bean
-    @Qualifier("documentFetcher")
-    RestTemplate restTemplate(RestTemplateBuilder restTemplateBuilder,
-                              DocumentFetcherErrorHandler errorHandler) {
+    @Bean(name = "fetchRestTemplate")
+    RestTemplate fetchRestTemplate(RestTemplateBuilder restTemplateBuilder,
+                                   DocumentFetcherErrorHandler errorHandler,
+                                   @Qualifier("fetchOAuth2Properties") OAuth2Config.Oauth2Properties properties) {
         return restTemplateBuilder
                 .errorHandler(errorHandler)
+                .additionalInterceptors(BearerTokenInterceptor.instance(properties))
+                .build();
+    }
+
+    @Bean(name = "publishRestTemplate")
+    RestTemplate publishRestTemplate(RestTemplateBuilder restTemplateBuilder,
+                                     DocumentFetcherErrorHandler errorHandler,
+                                     @Qualifier("publishOAuth2Properties") OAuth2Config.Oauth2Properties properties) {
+        return restTemplateBuilder
+                .errorHandler(errorHandler)
+                .additionalInterceptors(BearerTokenInterceptor.instance(properties))
                 .build();
     }
 
@@ -51,9 +58,7 @@ public class RestTemplateConfig {
     RestTemplateBuilder restTemplateBuilder() {
         return new RestTemplateBuilder()
                 .requestFactory(this::buildHttpRequestFactory)
-                .interceptors(
-                        buildClientHttpRequestInterceptor(),
-                        new BearerTokenInterceptor(buildAuthorizedClientManager()));
+                .interceptors(buildClientHttpRequestInterceptor());
     }
 
     private org.springframework.http.client.ClientHttpRequestFactory buildHttpRequestFactory() {
@@ -61,31 +66,6 @@ public class RestTemplateConfig {
         factory.setConnectTimeout(CONNECT_TIMEOUT);
         factory.setReadTimeout(READ_TIMEOUT);
         return factory;
-    }
-
-    private AuthorizedClientServiceOAuth2AuthorizedClientManager buildAuthorizedClientManager() {
-        final ClientRegistration clientRegistration =
-                ClientRegistration.withRegistrationId(REGISTRATION_ID)
-                        .clientAuthenticationMethod(ClientAuthenticationMethod.POST)
-                        .authorizationGrantType(new AuthorizationGrantType(oauth2Properties.getGrantType()))
-                        .tokenUri(oauth2Properties.getAccessTokenUri())
-                        .clientId(oauth2Properties.getClientId())
-                        .clientSecret(oauth2Properties.getClientSecret())
-                        .scope(oauth2Properties.getScope())
-                        .build();
-
-        final ClientRegistrationRepository repository = new InMemoryClientRegistrationRepository(clientRegistration);
-        final OAuth2AuthorizedClientService service = new InMemoryOAuth2AuthorizedClientService(repository);
-        final OAuth2AuthorizedClientProvider provider = OAuth2AuthorizedClientProviderBuilder.builder()
-                .clientCredentials()
-                .refreshToken()
-                .build();
-        final AuthorizedClientServiceOAuth2AuthorizedClientManager manager =
-                new AuthorizedClientServiceOAuth2AuthorizedClientManager(repository, service);
-
-        manager.setAuthorizedClientProvider(provider);
-
-        return manager;
     }
 
     private ClientHttpRequestInterceptor buildClientHttpRequestInterceptor() {
@@ -96,9 +76,14 @@ public class RestTemplateConfig {
     }
 
     @RequiredArgsConstructor
-    class BearerTokenInterceptor implements ClientHttpRequestInterceptor {
+    static class BearerTokenInterceptor implements ClientHttpRequestInterceptor {
 
         private final OAuth2AuthorizedClientManager manager;
+        private final OAuth2Config.Oauth2Properties oauth2Properties;
+
+        static BearerTokenInterceptor instance(OAuth2Config.Oauth2Properties properties) {
+            return new BearerTokenInterceptor(buildAuthorizedClientManager(properties), properties);
+        }
 
         @Override
         public ClientHttpResponse intercept(HttpRequest httpRequest,
@@ -119,6 +104,33 @@ public class RestTemplateConfig {
                     .map("Bearer "::concat)
                     .map(token -> executeRequest(httpRequest, bytes, clientHttpRequestExecution, token))
                     .orElseThrow(() -> new IllegalStateException("Cannot access the API without an access token"));
+        }
+
+        private static AuthorizedClientServiceOAuth2AuthorizedClientManager buildAuthorizedClientManager(
+                OAuth2Config.Oauth2Properties oauth2Properties
+        ) {
+            final ClientRegistration clientRegistration =
+                    ClientRegistration.withRegistrationId(REGISTRATION_ID)
+                            .clientAuthenticationMethod(ClientAuthenticationMethod.POST)
+                            .authorizationGrantType(new AuthorizationGrantType(oauth2Properties.getGrantType()))
+                            .tokenUri(oauth2Properties.getAccessTokenUri())
+                            .clientId(oauth2Properties.getClientId())
+                            .clientSecret(oauth2Properties.getClientSecret())
+                            .scope(oauth2Properties.getScope())
+                            .build();
+
+            final ClientRegistrationRepository repository = new InMemoryClientRegistrationRepository(clientRegistration);
+            final OAuth2AuthorizedClientService service = new InMemoryOAuth2AuthorizedClientService(repository);
+            final OAuth2AuthorizedClientProvider provider = OAuth2AuthorizedClientProviderBuilder.builder()
+                    .clientCredentials()
+                    .refreshToken()
+                    .build();
+            final AuthorizedClientServiceOAuth2AuthorizedClientManager manager =
+                    new AuthorizedClientServiceOAuth2AuthorizedClientManager(repository, service);
+
+            manager.setAuthorizedClientProvider(provider);
+
+            return manager;
         }
 
         private ClientHttpResponse executeRequest(HttpRequest httpRequest,

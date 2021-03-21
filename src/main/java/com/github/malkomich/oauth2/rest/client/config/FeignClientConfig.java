@@ -2,7 +2,8 @@ package com.github.malkomich.oauth2.rest.client.config;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,45 +22,34 @@ public class FeignClientConfig {
 
     private static final String REGISTRATION_ID = "oauth2-rest-client";
 
-    @Autowired
-    private Oauth2Properties oauth2Properties;
+    public static class FeignClientDocumentFetchConfig {
 
-    @Bean
-    public OAuthRequestInterceptor repositoryClientOAuth2Interceptor() {
-        return new OAuthRequestInterceptor(buildAuthorizedClientManager());
+        @Bean
+        public OAuthRequestInterceptor repositoryClientOAuth2Interceptor(
+                @Qualifier("fetchOAuth2Properties") OAuth2Config.Oauth2Properties properties
+        ) {
+            return OAuthRequestInterceptor.instance(properties);
+        }
     }
 
-    private AuthorizedClientServiceOAuth2AuthorizedClientManager buildAuthorizedClientManager() {
-        final ClientRegistration clientRegistration =
-                ClientRegistration.withRegistrationId(REGISTRATION_ID)
-                        .clientAuthenticationMethod(ClientAuthenticationMethod.POST)
-                        .authorizationGrantType(new AuthorizationGrantType(oauth2Properties.getGrantType()))
-                        .tokenUri(oauth2Properties.getAccessTokenUri())
-                        .clientId(oauth2Properties.getClientId())
-                        .clientSecret(oauth2Properties.getClientSecret())
-                        .scope(oauth2Properties.getScope())
-                        .build();
+    public static class FeignClientDocumentPublishConfig {
 
-        final ClientRegistrationRepository repository = new InMemoryClientRegistrationRepository(clientRegistration);
-        final OAuth2AuthorizedClientService service = new InMemoryOAuth2AuthorizedClientService(repository);
-        final OAuth2AuthorizedClientProvider provider = OAuth2AuthorizedClientProviderBuilder.builder()
-                .clientCredentials()
-                .refreshToken()
-                .build();
-        final AuthorizedClientServiceOAuth2AuthorizedClientManager manager =
-                new AuthorizedClientServiceOAuth2AuthorizedClientManager(repository, service);
-
-        manager.setAuthorizedClientProvider(provider);
-
-        return manager;
+        @Bean
+        public OAuthRequestInterceptor repositoryClientOAuth2Interceptor(
+                @Qualifier("publishOAuth2Properties") OAuth2Config.Oauth2Properties properties
+        ) {
+            return OAuthRequestInterceptor.instance(properties);
+        }
     }
 
-    public class OAuthRequestInterceptor implements RequestInterceptor {
+    @RequiredArgsConstructor
+    static class OAuthRequestInterceptor implements RequestInterceptor {
 
-        private OAuth2AuthorizedClientManager manager;
+        private final OAuth2AuthorizedClientManager manager;
+        private final OAuth2Config.Oauth2Properties oauth2Properties;
 
-        public OAuthRequestInterceptor(OAuth2AuthorizedClientManager manager) {
-            this.manager = manager;
+        static OAuthRequestInterceptor instance(OAuth2Config.Oauth2Properties properties) {
+            return new OAuthRequestInterceptor(buildAuthorizedClientManager(properties), properties);
         }
 
         @Override
@@ -80,6 +70,33 @@ public class FeignClientConfig {
                     .orElseThrow(() -> new IllegalStateException("Cannot access the API without an access token"));
 
             requestTemplate.header(HttpHeaders.AUTHORIZATION, authToken);
+        }
+
+        private static AuthorizedClientServiceOAuth2AuthorizedClientManager buildAuthorizedClientManager(
+                OAuth2Config.Oauth2Properties oauth2Properties
+        ) {
+            final ClientRegistration clientRegistration =
+                    ClientRegistration.withRegistrationId(REGISTRATION_ID)
+                            .clientAuthenticationMethod(ClientAuthenticationMethod.POST)
+                            .authorizationGrantType(new AuthorizationGrantType(oauth2Properties.getGrantType()))
+                            .tokenUri(oauth2Properties.getAccessTokenUri())
+                            .clientId(oauth2Properties.getClientId())
+                            .clientSecret(oauth2Properties.getClientSecret())
+                            .scope(oauth2Properties.getScope())
+                            .build();
+
+            final ClientRegistrationRepository repository = new InMemoryClientRegistrationRepository(clientRegistration);
+            final OAuth2AuthorizedClientService service = new InMemoryOAuth2AuthorizedClientService(repository);
+            final OAuth2AuthorizedClientProvider provider = OAuth2AuthorizedClientProviderBuilder.builder()
+                    .clientCredentials()
+                    .refreshToken()
+                    .build();
+            final AuthorizedClientServiceOAuth2AuthorizedClientManager manager =
+                    new AuthorizedClientServiceOAuth2AuthorizedClientManager(repository, service);
+
+            manager.setAuthorizedClientProvider(provider);
+
+            return manager;
         }
     }
 }
