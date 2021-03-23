@@ -23,3 +23,7 @@ api.document:
   publish:
     host: http://localhost:8086
     endpoint: document
+
+logging.level:
+  com.okta.developer: DEBUG
+  org.springframework.web: DEBUG

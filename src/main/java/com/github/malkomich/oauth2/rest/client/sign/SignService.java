@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.mapstruct.Mapper;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.mapstruct.factory.Mappers.getMapper;
@@ -38,7 +38,7 @@ public class SignService {
     private DocumentPublisher.PublishRequest toPublishRequest(Document document) {
         return DocumentPublisher.PublishRequest.builder()
                 .documentId(document.getId())
-                .signDate(LocalDateTime.now())
+                .signDate(OffsetDateTime.now())
                 .build();
     }
 
